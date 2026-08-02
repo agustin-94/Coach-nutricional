@@ -231,7 +231,7 @@ function setApiKey(key) {
    HELPERS: IA (Google Gemini - capa gratuita)
    ============================================================ */
 
-const GEMINI_MODEL = "gemini-2.5-flash";
+const GEMINI_MODEL = "gemini-flash-latest";
 
 async function callClaude(messages, maxTokens = 1000) {
   const apiKey = getApiKey();
@@ -289,6 +289,9 @@ async function callClaude(messages, maxTokens = 1000) {
     }
     if (response.status === 400 && /API key/i.test(detail)) {
       throw new Error("Tu API key no es válida. Revísala en Ajustes.");
+    }
+    if (response.status === 404) {
+      throw new Error("El modelo de IA cambió de nombre del lado de Google. Avisa a Agustín para actualizar la app.");
     }
     if (response.status === 429) {
       throw new Error("Llegaste al límite gratuito por ahora. Espera un minuto e intenta de nuevo.");

@@ -418,6 +418,55 @@ function fileToBase64(file) {
   });
 }
 
+function resizeImageToBase64(file, maxDim = 1600, quality = 0.75) {
+  return new Promise((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const img = new Image();
+
+    const cleanup = () => URL.revokeObjectURL(objectUrl);
+
+    img.onload = () => {
+      try {
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          if (width >= height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const dataUrl = canvas.toDataURL("image/jpeg", quality);
+        cleanup();
+        const base64 = dataUrl.split(",")[1] || "";
+        if (!base64) {
+          reject(new Error("No se pudo procesar la imagen"));
+          return;
+        }
+        resolve({ base64, mimeType: "image/jpeg" });
+      } catch (err) {
+        cleanup();
+        reject(err);
+      }
+    };
+
+    img.onerror = () => {
+      cleanup();
+      reject(new Error("No se pudo leer la imagen seleccionada"));
+    };
+
+    img.src = objectUrl;
+  });
+}
+
 const TICKET_PROMPT = `Eres un asistente que extrae los productos de alimentación de una foto de un ticket de compra de supermercado.
 Analiza la imagen y devuelve EXCLUSIVAMENTE un JSON válido (sin bloques de código markdown, sin texto adicional, sin explicaciones) con esta forma exacta:
 {"items":[{"name":"Pechuga de pollo","quantity":1,"unit":"kg","category":"proteina"}]}
@@ -1920,13 +1969,13 @@ function NutritionCoachApp() {
     setTicketError(null);
     setLastFile(file);
     try {
-      const base64 = await fileToBase64(file);
+      const { base64, mimeType } = await resizeImageToBase64(file);
       const messages = [
         {
           role: "user",
           content: [
             { type: "text", text: TICKET_PROMPT },
-            { type: "image", source: { type: "base64", media_type: file.type || "image/jpeg", data: base64 } }
+            { type: "image", source: { type: "base64", media_type: mimeType, data: base64 } }
           ]
         }
       ];

@@ -335,19 +335,43 @@ function parseClaudeJson(text) {
   let cleaned = text.trim();
   cleaned = cleaned.replace(/^```json/i, "").replace(/^```/, "").replace(/```$/, "");
   cleaned = cleaned.trim();
+
   try {
     return JSON.parse(cleaned);
   } catch (e) {
-    const start = cleaned.indexOf("{");
-    const end = cleaned.lastIndexOf("}");
-    if (start !== -1 && end !== -1 && end > start) {
+    // buscamos el bloque { ... } u [ ... ] más externo, lo que aparezca primero
+    const firstBrace = cleaned.indexOf("{");
+    const firstBracket = cleaned.indexOf("[");
+    let openChar = null;
+    let openIdx = -1;
+    if (firstBrace !== -1 && (firstBracket === -1 || firstBrace < firstBracket)) {
+      openChar = "{";
+      openIdx = firstBrace;
+    } else if (firstBracket !== -1) {
+      openChar = "[";
+      openIdx = firstBracket;
+    }
+    const closeChar = openChar === "{" ? "}" : "]";
+    const closeIdx = openChar ? cleaned.lastIndexOf(closeChar) : -1;
+
+    if (openIdx !== -1 && closeIdx !== -1 && closeIdx > openIdx) {
       try {
-        return JSON.parse(cleaned.slice(start, end + 1));
+        const parsed = JSON.parse(cleaned.slice(openIdx, closeIdx + 1));
+        // si vino un array suelto, lo envolvemos para que el resto del código lo encuentre
+        if (Array.isArray(parsed)) {
+          return { items: parsed, recetas: parsed };
+        }
+        return parsed;
       } catch (e2) {
-        throw new Error("No se pudo interpretar la respuesta de la IA");
+        // sigue abajo al error con diagnóstico
       }
     }
-    throw new Error("No se pudo interpretar la respuesta de la IA");
+
+    const preview = cleaned.slice(0, 300);
+    const err = new Error(
+      "No se pudo interpretar la respuesta de la IA.\n\nLo que contestó:\n" + preview
+    );
+    throw err;
   }
 }
 
@@ -619,7 +643,7 @@ function ErrorBanner({ message, onRetry }) {
     <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 flex items-start gap-3">
       <AlertCircle size={18} className="text-rose-500 shrink-0 mt-0.5" />
       <div className="flex-1">
-        <p className="text-sm text-rose-700 font-medium leading-snug">{message}</p>
+        <p className="text-sm text-rose-700 font-medium leading-snug whitespace-pre-wrap break-words">{message}</p>
         {onRetry && (
           <button
             type="button"

@@ -233,7 +233,11 @@ function setApiKey(key) {
 
 const GEMINI_MODEL = "gemini-flash-latest";
 
-async function callClaude(messages, maxTokens = 1000) {
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function callClaudeOnce(messages, maxTokens) {
   const apiKey = getApiKey();
   if (!apiKey) {
     const err = new Error("Falta tu API key de Gemini. Ve a Ajustes y pégala primero.");
@@ -300,6 +304,11 @@ async function callClaude(messages, maxTokens = 1000) {
     if (response.status === 429) {
       throw new Error("Llegaste al límite gratuito por ahora. Espera un minuto e intenta de nuevo.");
     }
+    if (response.status === 503) {
+      const err = new Error("El modelo gratuito está saturado en este momento. Probá de nuevo en unos segundos.");
+      err.code = "OVERLOADED";
+      throw err;
+    }
     throw new Error(detail || `Error de red (${response.status})`);
   }
 
@@ -326,6 +335,24 @@ async function callClaude(messages, maxTokens = 1000) {
   }
 
   return text;
+}
+
+async function callClaude(messages, maxTokens = 1000) {
+  const maxAttempts = 3;
+  let lastErr = null;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await callClaudeOnce(messages, maxTokens);
+    } catch (e) {
+      lastErr = e;
+      if (e && e.code === "OVERLOADED" && attempt < maxAttempts) {
+        await sleep(attempt * 1500);
+        continue;
+      }
+      throw e;
+    }
+  }
+  throw lastErr;
 }
 
 function parseClaudeJson(text) {

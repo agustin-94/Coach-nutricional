@@ -439,7 +439,7 @@ function fileToBase64(file) {
   });
 }
 
-function resizeImageToBase64(file, maxDim = 1600, quality = 0.75) {
+function resizeImageToBase64(file, maxDim = 2000, quality = 0.85) {
   return new Promise((resolve, reject) => {
     const objectUrl = URL.createObjectURL(file);
     const img = new Image();
@@ -2026,11 +2026,15 @@ function NutritionCoachApp() {
           summary: items.slice(0, 3).map((i) => i.name).join(", ") || "Sin productos detectados"
         }
       });
-      setTicketToast(
-        items.length > 0
-          ? `${items.length} ingrediente${items.length === 1 ? "" : "s"} añadido${items.length === 1 ? "" : "s"} a tu despensa`
-          : "No se detectaron productos en el ticket"
-      );
+      if (items.length > 0) {
+        setTicketToast(
+          `${items.length} ingrediente${items.length === 1 ? "" : "s"} añadido${items.length === 1 ? "" : "s"} a tu despensa`
+        );
+      } else {
+        setTicketError(
+          "No se detectó ningún producto en esa foto. Probá con más luz, más cerca del ticket y que se lea bien el texto."
+        );
+      }
     } catch (e) {
       setTicketError((e && e.message) || "No pudimos leer el ticket. Inténtalo de nuevo.");
     } finally {
